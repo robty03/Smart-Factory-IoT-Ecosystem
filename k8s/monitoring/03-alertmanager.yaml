@@ -16,7 +16,7 @@ data:
     receivers:
     - name: 'telegram-bot'
       telegram_configs:
-      - bot_token: '8616090491:AAGno7BUihpyEr4jlavzADHa5su3404te94'
+      - bot_token_file: /etc/alertmanager/secrets/bot_token
         chat_id: 6464616938
         parse_mode: 'HTML'
         message: |
@@ -24,18 +24,18 @@ data:
           🚨 <b>INCIDENT CRITIC DETECTAT</b>
           <b>ID Incident:</b> <code>#{{ (index .Alerts 0).Fingerprint }}</code>
           <b>Status:</b> 🔥 ACTIV
-          
+
           <b>📋 Analiză:</b> {{ (index .Alerts 0).Annotations.description }}
-          
+
           <b>⏱️ Detectat la:</b> {{ (index .Alerts 0).StartsAt.Format "15:04:05" }} UTC
           <i>(Notă: Ora RO = UTC + 2h)</i>
           {{ else }}
           ✅ <b>SISTEM RESTABILIT</b>
           <b>ID Incident:</b> <code>#{{ (index .Alerts 0).Fingerprint }}</code>
           <b>Status:</b> 🟢 REZOLVAT
-          
+
           <b>✨ Rezultat:</b> Componenta a fost recuperată. Parametrii de funcționare sunt acum în limite normale.
-          
+
           <b>⏱️ Rezolvat la:</b> {{ (index .Alerts 0).EndsAt.Format "15:04:05" }} UTC
           <i>(Notă: Ora RO = UTC + 2h)</i>
           {{ end }}
@@ -66,10 +66,18 @@ spec:
         volumeMounts:
         - name: config
           mountPath: /etc/alertmanager
+        # Montăm folderul unde K8s va injecta Token-ul din Secret
+        - name: telegram-token
+          mountPath: /etc/alertmanager/secrets
+          readOnly: true
       volumes:
       - name: config
         configMap:
           name: alertmanager-config
+      # Definim volumul de tip Secret
+      - name: telegram-token
+        secret:
+          secretName: telegram-secret
 ---
 apiVersion: v1
 kind: Service
