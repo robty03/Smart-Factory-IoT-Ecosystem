@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: licenta-iot
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'telegram-bot'
+    receivers:
+    - name: 'telegram-bot'
+      telegram_configs:
+      - bot_token: '8616090491:AAGno7BUihpyEr4jlavzADHa5su3404te94'
+        chat_id: 6464616938
+        parse_mode: 'HTML'
+        message: |
+          {{ if eq .Status "firing" }}
+          🚨 <b>INCIDENT CRITIC DETECTAT</b>
+          <b>ID Incident:</b> <code>#{{ (index .Alerts 0).Fingerprint }}</code>
+          <b>Status:</b> 🔥 ACTIV
+          
+          <b>📋 Analiză:</b> {{ (index .Alerts 0).Annotations.description }}
+          
+          <b>⏱️ Detectat la:</b> {{ (index .Alerts 0).StartsAt.Format "15:04:05" }} UTC
+          <i>(Notă: Ora RO = UTC + 2h)</i>
+          {{ else }}
+          ✅ <b>SISTEM RESTABILIT</b>
+          <b>ID Incident:</b> <code>#{{ (index .Alerts 0).Fingerprint }}</code>
+          <b>Status:</b> 🟢 REZOLVAT
+          
+          <b>✨ Rezultat:</b> Componenta a fost recuperată. Parametrii de funcționare sunt acum în limite normale.
+          
+          <b>⏱️ Rezolvat la:</b> {{ (index .Alerts 0).EndsAt.Format "15:04:05" }} UTC
+          <i>(Notă: Ora RO = UTC + 2h)</i>
+          {{ end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: licenta-iot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+    spec:
+      containers:
+      - name: alertmanager
+        image: prom/alertmanager:latest
+        args:
+          - "--config.file=/etc/alertmanager/alertmanager.yml"
+          - "--storage.path=/alertmanager"
+        ports:
+          - containerPort: 9093
+        volumeMounts:
+        - name: config
+          mountPath: /etc/alertmanager
+      volumes:
+      - name: config
+        configMap:
+          name: alertmanager-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-service
+  namespace: licenta-iot
+spec:
+  selector:
+    app: alertmanager
+  ports:
+    - port: 9093
+      targetPort: 9093

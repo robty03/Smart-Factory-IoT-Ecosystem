@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: licenta-iot
+data:
+  rules.yml: |
+    groups:
+    - name: iot_system_alerts
+      rules:
+      - alert: Worker_Inoperabil
+        expr: up{job="worker_node"} == 0
+        for: 10s
+        labels:
+          severity: critical
+          component: "DataProcessor"
+        annotations:
+          summary: "Întrerupere critică a fluxului de procesare"
+          description: "Serviciul de procesare a datelor IOT a încetat să funcționeze. Toate instanțele de tip Worker sunt indisponibile în cluster, ceea ce blochează salvarea telemetriei în baza de date."
+
+      - alert: RabbitMQ_Supraîncărcat
+        expr: rabbitmq_queue_messages > 100
+        for: 1m
+        labels:
+          severity: warning
+          component: "MessageBroker"
+        annotations:
+          summary: "Congestie detectată în coada de mesaje"
+          description: "Sistemul RabbitMQ a acumulat un volum mare de mesaje neprocesate. Rata de producție a senzorilor depășește capacitatea actuală de consum a workerilor."

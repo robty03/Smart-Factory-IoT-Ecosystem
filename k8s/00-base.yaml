@@ -1,0 +1,24 @@
+---
+# 1. Creăm un "spațiu" dedicat pentru proiectul tău
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: licenta-iot
+
+---
+# 2. Mutăm parolele din .env în sistemul securizat K8s (Secrets)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: licenta-secrets
+  namespace: licenta-iot
+type: Opaque
+stringData:
+  # K8s va cripta automat aceste texte în spate
+  POSTGRES_USER: "admin"
+  POSTGRES_PASSWORD: "parolalicenta"
+  POSTGRES_DB: "sensordata"
+  RABBITMQ_DEFAULT_USER: "admin"
+  RABBITMQ_DEFAULT_PASS: "parolalicenta"
+  DB_URL: "postgres://admin:parolalicenta@timescaledb:5432/sensordata?sslmode=disable"
+  RABBITMQ_URL: "amqp://admin:parolalicenta@rabbitmq:5672/"

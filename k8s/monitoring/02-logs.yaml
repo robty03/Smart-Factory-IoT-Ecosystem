@@ -1,0 +1,106 @@
+---
+# 1. Baza de date pentru loguri (Loki)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki
+  namespace: licenta-iot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki
+  template:
+    metadata:
+      labels:
+        app: loki
+    spec:
+      containers:
+      - name: loki
+        image: grafana/loki:latest
+        ports:
+        - containerPort: 3100
+        args:
+        - "-config.file=/etc/loki/local-config.yaml"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki-service
+  namespace: licenta-iot
+spec:
+  selector:
+    app: loki
+  ports:
+  - port: 3100
+    targetPort: 3100
+
+---
+# 2. Configurarea Promtail
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-config
+  namespace: licenta-iot
+data:
+  promtail.yaml: |
+    server:
+      http_listen_port: 9080
+    clients:
+      - url: http://loki-service:3100/loki/api/v1/push
+    scrape_configs:
+      - job_name: direct-disk-read
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              namespace: licenta-iot
+              __path__: /var/log/pods/licenta-iot_*/*/*.log
+        pipeline_stages:
+          - cri: {}
+          # Tăiem calea folderului pentru a extrage automat etichetele
+          - regex:
+              expression: "/var/log/pods/[^_]+_(?P<pod>[^_]+)_[^/]+/(?P<container>[^/]+)/.*\\.log"
+              source: "filename"
+          - labels:
+              pod:
+              container:
+
+---
+# 3. Colectorul de loguri (DaemonSet)
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: promtail
+  namespace: licenta-iot
+spec:
+  selector:
+    matchLabels:
+      app: promtail
+  template:
+    metadata:
+      labels:
+        app: promtail
+    spec:
+      serviceAccountName: promtail
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+      containers:
+      - name: promtail
+        image: grafana/promtail:latest
+        args:
+        - "-config.file=/etc/promtail/promtail.yaml"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/promtail
+        - name: varlog
+          mountPath: /var/log
+      volumes:
+      - name: config
+        configMap:
+          name: promtail-config
+      - name: varlog
+        hostPath:
+          path: /var/log

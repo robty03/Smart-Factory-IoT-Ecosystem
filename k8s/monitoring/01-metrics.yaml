@@ -1,0 +1,115 @@
+---
+# 1. Configurarea pentru Prometheus (ConfigMap actualizat cu Alerting și Rules)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: licenta-iot
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+
+    # Conectarea la Alertmanager
+    alerting:
+      alertmanagers:
+      - static_configs:
+        - targets: ['alertmanager-service:9093']
+
+    # Încărcarea regulilor de alertare
+    rule_files:
+      - "/etc/prometheus/rules.yml"
+
+    scrape_configs:
+      - job_name: 'producer_api'
+        static_configs:
+          - targets: ['producer-service:8080']
+      - job_name: 'worker_node'
+        static_configs:
+          - targets: ['worker-metrics:8081']
+
+---
+# 2. Serverul Prometheus (Deployment actualizat cu Volume pentru Reguli)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: licenta-iot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:latest
+        args:
+          - "--config.file=/etc/prometheus/prometheus.yml"
+          - "--storage.tsdb.path=/prometheus"
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/prometheus/prometheus.yml
+          subPath: prometheus.yml
+        # Montăm fișierul de reguli aici
+        - name: rules-volume
+          mountPath: /etc/prometheus/rules.yml
+          subPath: rules.yml
+      volumes:
+      - name: config-volume
+        configMap:
+          name: prometheus-config
+      # Volumul care preia datele din ConfigMap-ul de reguli (04-prometheus-rules.yaml)
+      - name: rules-volume
+        configMap:
+          name: prometheus-rules
+
+---
+# 3. Interfața Grafana
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: licenta-iot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: licenta-secrets
+              key: POSTGRES_PASSWORD
+---
+# 4. Expunem Grafana în afara clusterului (pe portul 30000)
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: licenta-iot
+spec:
+  type: NodePort
+  selector:
+    app: grafana
+  ports:
+  - port: 3000
+    targetPort: 3000
+    nodePort: 30000
