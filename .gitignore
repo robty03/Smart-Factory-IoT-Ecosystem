@@ -1,0 +1,28 @@
+# === Binaries & Executables ===
+# Excludem fișierele compilate (cele care apar după go build)
+bin/
+main
+simulator
+worker
+producer
+cli
+
+# === Go Dependencies ===
+# Nu urcăm folderele de biblioteci, doar go.mod și go.sum sunt necesare
+vendor/
+
+# === Secrets & Sensitive Data ===
+# EXTREM DE IMPORTANT: Excludem fișierele care conțin Token-uri sau Parole
+*.env
+k8s/monitoring/secrets.yaml
+secrets.yaml
+
+# === IDE & OS Files ===
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# === Temporary Files ===
+*.log
+tmp/
